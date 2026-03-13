@@ -15,6 +15,7 @@ DB_PORT = "13181"
 DB_USER = "root"
 DB_NAME = "railway"
 BASE_URL = "https://web-production-9446f.up.railway.app"
+ADMIN_PASSWORD = "admin123"
 
 [workflows]
 runButton = "Project"

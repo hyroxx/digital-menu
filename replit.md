@@ -51,6 +51,18 @@ Turkish (tr), English (en), Spanish (es), French (fr), Irish/Gaeilge (ga)
 | `PORT` | Server port (5000) |
 | `BASE_URL` | Public URL for QR code generation |
 
+## Admin Panel
+
+Accessible at `/admin`. Protected by password (default: `admin123`, change via `ADMIN_PASSWORD` env var).
+
+Features:
+- Add/edit/delete restaurants with logo upload
+- Manage categories and subcategories per restaurant
+- Add/edit/delete menu items with image upload
+- Auto-translate (⚡ button) for names, descriptions, about text — translates to all 5 languages
+- QR code view and download per restaurant
+- Session-based authentication (24h)
+
 ## Deployment
 
 - Target: Autoscale

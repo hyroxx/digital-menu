@@ -26,6 +26,34 @@ async function runMigrations() {
         UNIQUE KEY uq_rest_lang (restaurant_id, language_code)
       )
     `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS menu_category_translations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        category_id INT NOT NULL,
+        language_code VARCHAR(10) NOT NULL,
+        name VARCHAR(255),
+        UNIQUE KEY uq_cat_lang (category_id, language_code)
+      )
+    `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS menu_subcategory_translations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        subcategory_id INT NOT NULL,
+        language_code VARCHAR(10) NOT NULL,
+        name VARCHAR(255),
+        UNIQUE KEY uq_sub_lang (subcategory_id, language_code)
+      )
+    `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS menu_item_translations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        menu_item_id INT NOT NULL,
+        language_code VARCHAR(10) NOT NULL,
+        name VARCHAR(255),
+        description TEXT,
+        UNIQUE KEY uq_item_lang (menu_item_id, language_code)
+      )
+    `);
     console.log('✅ Migrations complete');
   } catch (err) {
     console.error('❌ Migration error:', err.message);

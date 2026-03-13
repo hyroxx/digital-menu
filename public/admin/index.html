@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Menu — Admin Panel</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+
+<!-- ─── Login ─────────────────────────────────────────────────────────────── -->
+<div id="login-screen" class="login-screen hidden">
+  <div class="login-card">
+    <div class="login-logo">🍽️</div>
+    <h1>Admin Panel</h1>
+    <p class="login-sub">QR Menu Yönetim Sistemi</p>
+    <form class="login-form" id="login-form">
+      <input class="form-input" type="password" id="login-password" placeholder="Şifre" autocomplete="current-password">
+      <button class="btn btn-primary btn-full" type="submit">Giriş Yap</button>
+      <p class="error-msg hidden" id="login-error">Hatalı şifre</p>
+    </form>
+  </div>
+</div>
+
+<!-- ─── App ───────────────────────────────────────────────────────────────── -->
+<div id="app" class="app hidden">
+
+  <header class="header">
+    <div class="header-left">
+      <span class="header-logo">🍽️</span>
+      <span class="header-title">QR Menu Admin</span>
+    </div>
+    <div class="header-right">
+      <button class="btn btn-ghost btn-sm" id="btn-logout">Çıkış Yap</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-title">Restoranlar</span>
+        <button class="btn btn-primary btn-sm" id="btn-add-restaurant">+ Ekle</button>
+      </div>
+      <div class="restaurant-list" id="restaurant-list">
+        <p class="loading-text">Yükleniyor...</p>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main" id="main-content">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">🏪</div>
+        <h2>Restoran Seçin</h2>
+        <p class="text-secondary">Soldan bir restoran seçin veya yeni ekleyin.</p>
+      </div>
+
+      <!-- Restaurant Detail -->
+      <div id="rest-detail" class="hidden">
+        <div class="rest-detail-header">
+          <h1 class="rest-detail-name" id="detail-name"></h1>
+          <div class="rest-actions">
+            <button class="btn btn-ghost btn-sm" id="btn-view-qr">📱 QR Kodu</button>
+            <button class="btn btn-ghost btn-sm" id="btn-view-site">🌐 Siteyi Gör</button>
+            <button class="btn btn-ghost btn-sm" id="btn-edit-rest">✏️ Düzenle</button>
+            <button class="btn btn-danger btn-sm" id="btn-delete-rest">🗑️ Sil</button>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="categories">Kategoriler</button>
+          <button class="tab" data-tab="items">Ürünler</button>
+        </div>
+
+        <!-- Categories Tab -->
+        <div id="tab-categories">
+          <div class="section-header">
+            <span class="section-title">Kategori Listesi</span>
+            <button class="btn btn-primary btn-sm" id="btn-add-category">+ Kategori Ekle</button>
+          </div>
+          <div id="category-list"></div>
+        </div>
+
+        <!-- Items Tab -->
+        <div id="tab-items" class="hidden">
+          <div class="section-header">
+            <span class="section-title">Tüm Ürünler</span>
+            <button class="btn btn-primary btn-sm" id="btn-add-item">+ Ürün Ekle</button>
+          </div>
+          <div class="filter-row">
+            <select class="form-select" id="item-filter-cat" style="width:auto">
+              <option value="">Tüm Kategoriler</option>
+            </select>
+            <span class="items-count" id="items-count"></span>
+          </div>
+          <div class="card" id="item-list"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ─── Modal: Restaurant ──────────────────────────────────────────────────── -->
+<div class="modal hidden" id="modal-restaurant">
+  <div class="modal-backdrop" onclick="closeModal('modal-restaurant')"></div>
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="modal-rest-title">Restoran Ekle</h2>
+      <button class="modal-close" onclick="closeModal('modal-restaurant')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Restoran Adı *</label>
+          <input class="form-input" id="rest-name" type="text" placeholder="Cafe Eva">
+        </div>
+        <div class="form-group">
+          <label class="form-label">URL Slug *</label>
+          <input class="form-input" id="rest-slug" type="text" placeholder="cafe-eva">
+          <p class="form-hint">Sadece harf, rakam ve tire. Örnek: cafe-eva</p>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Logo URL</label>
+        <input class="form-input" id="rest-logo" type="text" placeholder="https://...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Logo Yükle</label>
+        <div class="upload-area" id="rest-logo-upload-area">
+          <input type="file" id="rest-logo-file" accept="image/*">
+          <p>📁 Tıklayın veya fotoğrafı sürükleyin</p>
+          <img id="rest-logo-preview" class="upload-preview hidden" src="" alt="preview">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Hakkımızda Metni (Ana Dil)</label>
+        <textarea class="form-textarea" id="rest-about" placeholder="Restoranınız hakkında kısa bir metin..."></textarea>
+        <div class="flex-row mt-1">
+          <select class="form-select" id="rest-source-lang" style="width:auto;font-size:12px">
+            <option value="tr">🇹🇷 Türkçe</option>
+            <option value="en">🇬🇧 English</option>
+            <option value="es">🇪🇸 Español</option>
+            <option value="fr">🇫🇷 Français</option>
+            <option value="ga">🇮🇪 Gaeilge</option>
+          </select>
+          <button class="btn btn-success btn-sm" id="btn-translate-about">⚡ Otomatik Çevir</button>
+        </div>
+      </div>
+      <div class="translation-block" id="rest-about-translations">
+        <div class="translation-header" onclick="toggleTranslations('rest-about-translations')">
+          <span>🌍 Hakkımızda Çevirileri</span>
+          <span>▼</span>
+        </div>
+        <div class="translation-content" id="rest-about-trans-content">
+          <div><p class="trans-lang">🇹🇷 Türkçe</p><textarea class="form-textarea" id="rest-trans-tr" placeholder="Türkçe metin..." rows="3"></textarea></div>
+          <div><p class="trans-lang">🇬🇧 English</p><textarea class="form-textarea" id="rest-trans-en" placeholder="English text..." rows="3"></textarea></div>
+          <div><p class="trans-lang">🇪🇸 Español</p><textarea class="form-textarea" id="rest-trans-es" placeholder="Texto en español..." rows="3"></textarea></div>
+          <div><p class="trans-lang">🇫🇷 Français</p><textarea class="form-textarea" id="rest-trans-fr" placeholder="Texte en français..." rows="3"></textarea></div>
+          <div><p class="trans-lang">🇮🇪 Gaeilge</p><textarea class="form-textarea" id="rest-trans-ga" placeholder="Téacs Gaeilge..." rows="3"></textarea></div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Telefon</label>
+          <input class="form-input" id="rest-phone" type="text" placeholder="+90 555 123 4567">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Çalışma Saatleri</label>
+          <input class="form-input" id="rest-hours" type="text" placeholder="09:00 - 22:00">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Adres</label>
+        <input class="form-input" id="rest-address" type="text">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Instagram</label>
+          <input class="form-input" id="rest-instagram" type="text" placeholder="https://instagram.com/...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Facebook</label>
+          <input class="form-input" id="rest-facebook" type="text" placeholder="https://facebook.com/...">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Web Sitesi</label>
+        <input class="form-input" id="rest-website" type="text" placeholder="https://...">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-restaurant')">İptal</button>
+      <button class="btn btn-primary" id="btn-save-restaurant">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Modal: Category ────────────────────────────────────────────────────── -->
+<div class="modal hidden" id="modal-category">
+  <div class="modal-backdrop" onclick="closeModal('modal-category')"></div>
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <h2 id="modal-cat-title">Kategori Ekle</h2>
+      <button class="modal-close" onclick="closeModal('modal-category')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Kategori Adı (Ana Dil) *</label>
+        <input class="form-input" id="cat-name" type="text" placeholder="Başlangıçlar">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sıra</label>
+        <input class="form-input" id="cat-order" type="number" value="0" min="0">
+      </div>
+      <div class="flex-row" style="margin-bottom:0.75rem">
+        <select class="form-select" id="cat-source-lang" style="width:auto;font-size:12px">
+          <option value="tr">🇹🇷 Türkçe</option>
+          <option value="en">🇬🇧 English</option>
+          <option value="es">🇪🇸 Español</option>
+          <option value="fr">🇫🇷 Français</option>
+          <option value="ga">🇮🇪 Gaeilge</option>
+        </select>
+        <button class="btn btn-success btn-sm" id="btn-translate-cat">⚡ Otomatik Çevir</button>
+      </div>
+      <div class="translation-block" id="cat-translations">
+        <div class="translation-header" onclick="toggleTranslations('cat-translations')">
+          <span>🌍 İsim Çevirileri</span>
+          <span>▼</span>
+        </div>
+        <div class="translation-content" id="cat-trans-content">
+          <div><p class="trans-lang">🇹🇷 Türkçe</p><input class="form-input" id="cat-trans-tr" type="text"></div>
+          <div><p class="trans-lang">🇬🇧 English</p><input class="form-input" id="cat-trans-en" type="text"></div>
+          <div><p class="trans-lang">🇪🇸 Español</p><input class="form-input" id="cat-trans-es" type="text"></div>
+          <div><p class="trans-lang">🇫🇷 Français</p><input class="form-input" id="cat-trans-fr" type="text"></div>
+          <div><p class="trans-lang">🇮🇪 Gaeilge</p><input class="form-input" id="cat-trans-ga" type="text"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-category')">İptal</button>
+      <button class="btn btn-primary" id="btn-save-category">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Modal: Subcategory ─────────────────────────────────────────────────── -->
+<div class="modal hidden" id="modal-subcategory">
+  <div class="modal-backdrop" onclick="closeModal('modal-subcategory')"></div>
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <h2 id="modal-sub-title">Alt Kategori Ekle</h2>
+      <button class="modal-close" onclick="closeModal('modal-subcategory')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Alt Kategori Adı *</label>
+        <input class="form-input" id="sub-name" type="text" placeholder="Sıcak İçecekler">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sıra</label>
+        <input class="form-input" id="sub-order" type="number" value="0" min="0">
+      </div>
+      <div class="flex-row" style="margin-bottom:0.75rem">
+        <select class="form-select" id="sub-source-lang" style="width:auto;font-size:12px">
+          <option value="tr">🇹🇷 Türkçe</option>
+          <option value="en">🇬🇧 English</option>
+          <option value="es">🇪🇸 Español</option>
+          <option value="fr">🇫🇷 Français</option>
+          <option value="ga">🇮🇪 Gaeilge</option>
+        </select>
+        <button class="btn btn-success btn-sm" id="btn-translate-sub">⚡ Otomatik Çevir</button>
+      </div>
+      <div class="translation-block" id="sub-translations">
+        <div class="translation-header" onclick="toggleTranslations('sub-translations')">
+          <span>🌍 İsim Çevirileri</span>
+          <span>▼</span>
+        </div>
+        <div class="translation-content" id="sub-trans-content">
+          <div><p class="trans-lang">🇹🇷 Türkçe</p><input class="form-input" id="sub-trans-tr" type="text"></div>
+          <div><p class="trans-lang">🇬🇧 English</p><input class="form-input" id="sub-trans-en" type="text"></div>
+          <div><p class="trans-lang">🇪🇸 Español</p><input class="form-input" id="sub-trans-es" type="text"></div>
+          <div><p class="trans-lang">🇫🇷 Français</p><input class="form-input" id="sub-trans-fr" type="text"></div>
+          <div><p class="trans-lang">🇮🇪 Gaeilge</p><input class="form-input" id="sub-trans-ga" type="text"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-subcategory')">İptal</button>
+      <button class="btn btn-primary" id="btn-save-subcategory">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Modal: Item ────────────────────────────────────────────────────────── -->
+<div class="modal hidden" id="modal-item">
+  <div class="modal-backdrop" onclick="closeModal('modal-item')"></div>
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="modal-item-title">Ürün Ekle</h2>
+      <button class="modal-close" onclick="closeModal('modal-item')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Ürün Adı (Ana Dil) *</label>
+        <input class="form-input" id="item-name" type="text" placeholder="Mercimek Çorbası">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Açıklama (Ana Dil)</label>
+        <textarea class="form-textarea" id="item-desc" placeholder="Ürün açıklaması..." rows="2"></textarea>
+      </div>
+      <div class="flex-row" style="margin-bottom:0.75rem">
+        <select class="form-select" id="item-source-lang" style="width:auto;font-size:12px">
+          <option value="tr">🇹🇷 Türkçe</option>
+          <option value="en">🇬🇧 English</option>
+          <option value="es">🇪🇸 Español</option>
+          <option value="fr">🇫🇷 Français</option>
+          <option value="ga">🇮🇪 Gaeilge</option>
+        </select>
+        <button class="btn btn-success btn-sm" id="btn-translate-item">⚡ Otomatik Çevir</button>
+      </div>
+      <div class="translation-block" id="item-translations">
+        <div class="translation-header" onclick="toggleTranslations('item-translations')">
+          <span>🌍 Ad / Açıklama Çevirileri</span>
+          <span>▼</span>
+        </div>
+        <div class="translation-content" id="item-trans-content">
+          <div><p class="trans-lang">🇹🇷 Türkçe</p><input class="form-input" id="item-trans-name-tr" type="text" placeholder="Ad"><textarea class="form-textarea mt-1" id="item-trans-desc-tr" placeholder="Açıklama" rows="2"></textarea></div>
+          <div><p class="trans-lang">🇬🇧 English</p><input class="form-input" id="item-trans-name-en" type="text" placeholder="Name"><textarea class="form-textarea mt-1" id="item-trans-desc-en" placeholder="Description" rows="2"></textarea></div>
+          <div><p class="trans-lang">🇪🇸 Español</p><input class="form-input" id="item-trans-name-es" type="text" placeholder="Nombre"><textarea class="form-textarea mt-1" id="item-trans-desc-es" placeholder="Descripción" rows="2"></textarea></div>
+          <div><p class="trans-lang">🇫🇷 Français</p><input class="form-input" id="item-trans-name-fr" type="text" placeholder="Nom"><textarea class="form-textarea mt-1" id="item-trans-desc-fr" placeholder="Description" rows="2"></textarea></div>
+          <div><p class="trans-lang">🇮🇪 Gaeilge</p><input class="form-input" id="item-trans-name-ga" type="text" placeholder="Ainm"><textarea class="form-textarea mt-1" id="item-trans-desc-ga" placeholder="Cur síos" rows="2"></textarea></div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Fiyat *</label>
+          <input class="form-input" id="item-price" type="number" step="0.01" min="0" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Para Birimi</label>
+          <select class="form-select" id="item-currency">
+            <option value="TRY">TRY (₺)</option>
+            <option value="EUR">EUR (€)</option>
+            <option value="USD">USD ($)</option>
+            <option value="GBP">GBP (£)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Kategori</label>
+          <select class="form-select" id="item-category"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Alt Kategori</label>
+          <select class="form-select" id="item-subcategory"></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Alerjenler</label>
+        <input class="form-input" id="item-allergens" type="text" placeholder="Gluten, Süt, Yumurta (virgülle ayırın)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ürün Görseli</label>
+        <div class="upload-area" id="item-img-upload-area">
+          <input type="file" id="item-img-file" accept="image/*">
+          <p>📁 Tıklayın veya fotoğrafı sürükleyin</p>
+          <img id="item-img-preview" class="upload-preview hidden" src="" alt="preview">
+        </div>
+        <input class="form-input mt-1" id="item-image-url" type="text" placeholder="veya görsel URL girin...">
+      </div>
+      <div class="form-group">
+        <label class="form-check">
+          <input type="checkbox" id="item-is-new">
+          <span>Yeni Ürün (NEW etiketi göster)</span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sıra</label>
+        <input class="form-input" id="item-order" type="number" value="0" min="0">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-item')">İptal</button>
+      <button class="btn btn-primary" id="btn-save-item">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Modal: QR ──────────────────────────────────────────────────────────── -->
+<div class="modal hidden" id="modal-qr">
+  <div class="modal-backdrop" onclick="closeModal('modal-qr')"></div>
+  <div class="modal-box" style="max-width:360px">
+    <div class="modal-header">
+      <h2>QR Kodu</h2>
+      <button class="modal-close" onclick="closeModal('modal-qr')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="qr-container">
+        <img id="qr-img" src="" alt="QR Code">
+        <p class="qr-url" id="qr-url"></p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <a class="btn btn-primary" id="qr-download" download="qr-code.png">⬇️ İndir</a>
+    </div>
+  </div>
+</div>
+
+<script src="/admin/admin.js"></script>
+</body>
+</html>

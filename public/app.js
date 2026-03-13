@@ -240,10 +240,9 @@ function renderMenuPage() {
   renderBreadcrumbs();
 
   if (!state.selectedCategory) {
-    // Initial menu view: show categories + new items below (no title, just items with NEW badge)
     renderCategoryFilters();
     document.getElementById('subcategory-filters').classList.add('hidden');
-    renderItems({ newOnly: true });
+    renderAllItemsByCategory();
   } else {
     document.getElementById('category-filters').innerHTML = '';
     const subs = state.subcategories.filter(s => s.category_id === state.selectedCategory);
@@ -344,8 +343,34 @@ function renderSubcategoryFilters(subs) {
 
 // ─── Items ────────────────────────────────────────────────────────────────────
 
-// Single function: renders items directly into #menu-items (which is already a CSS grid).
-// newOnly=true → show only is_new items (for initial menu view, no heading).
+function renderAllItemsByCategory() {
+  const container = document.getElementById('menu-items');
+  container.innerHTML = '';
+
+  if (state.categories.length === 0) {
+    const msg = document.createElement('p');
+    msg.className = 'no-items';
+    msg.textContent = t('noItems');
+    container.appendChild(msg);
+    return;
+  }
+
+  state.categories.forEach(cat => {
+    const catItems = state.items.filter(i => i.category_id === cat.id);
+    if (catItems.length === 0) return;
+
+    const heading = document.createElement('h2');
+    heading.className = 'category-heading';
+    heading.textContent = cat.name;
+    container.appendChild(heading);
+
+    catItems.forEach(item => container.appendChild(buildItemCard(item)));
+  });
+
+  const uncategorized = state.items.filter(i => !i.category_id);
+  uncategorized.forEach(item => container.appendChild(buildItemCard(item)));
+}
+
 function renderItems({ newOnly = false } = {}) {
   const container = document.getElementById('menu-items');
   container.innerHTML = '';

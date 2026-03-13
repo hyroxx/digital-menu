@@ -398,6 +398,20 @@ body {
   color: var(--text-secondary);
 }
 
+.category-heading {
+  grid-column: 1 / -1;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 1.5rem 0 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--primary);
+}
+
+.category-heading:first-child {
+  margin-top: 0;
+}
+
 .no-items {
   text-align: center;
   padding: 4rem 2rem;

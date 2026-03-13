@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
+const { translateText } = require('../utils/translate');
 
 router.get('/:slug', async (req, res) => {
   const { slug } = req.params;
@@ -23,13 +24,30 @@ router.get('/:slug', async (req, res) => {
     }
 
     const restaurant = restaurantRows[0];
+
+    if (!restaurant.about_text_translated && restaurant.about_text && lang !== 'en') {
+      try {
+        const translated = await translateText(restaurant.about_text, lang);
+        if (translated && translated !== restaurant.about_text) {
+          restaurant.about_text_translated = translated;
+          pool.query(
+            `INSERT INTO restaurant_translations (restaurant_id, language_code, about_text)
+             VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE about_text = VALUES(about_text)`,
+            [restaurant.id, lang, translated]
+          ).catch(err => console.error('Cache translation error:', err.message));
+        }
+      } catch (err) {
+        console.error('Auto-translate error:', err.message);
+      }
+    }
+
     restaurant.about_text_display = restaurant.about_text_translated || restaurant.about_text;
     delete restaurant.about_text_translated;
 
     const [categoryRows] = await pool.query(
       `SELECT c.id, c.restaurant_id, c.display_order,
-              COALESCE(ct.name, c.name) AS name,
-              ct.name AS translatedName
+              COALESCE(ct.name, c.name) AS name
        FROM menu_categories c
        LEFT JOIN menu_category_translations ct
          ON ct.category_id = c.id AND ct.language_code = ?
@@ -40,8 +58,7 @@ router.get('/:slug', async (req, res) => {
 
     const [subcategoryRows] = await pool.query(
       `SELECT s.id, s.restaurant_id, s.category_id, s.display_order,
-              COALESCE(st.name, s.name) AS name,
-              st.name AS translatedName
+              COALESCE(st.name, s.name) AS name
        FROM menu_subcategories s
        LEFT JOIN menu_subcategory_translations st
          ON st.subcategory_id = s.id AND st.language_code = ?
@@ -55,9 +72,7 @@ router.get('/:slug', async (req, res) => {
               i.price, i.currency, i.is_new, i.allergens, i.image_url,
               i.display_order, i.created_at,
               COALESCE(it.name, i.name) AS name,
-              COALESCE(it.description, i.description) AS description,
-              it.name AS translatedName,
-              it.description AS translatedDescription
+              COALESCE(it.description, i.description) AS description
        FROM menu_items i
        LEFT JOIN menu_item_translations it
          ON it.menu_item_id = i.id AND it.language_code = ?
@@ -96,13 +111,11 @@ router.post('/:slug/translations', async (req, res) => {
       return res.status(404).json({ error: 'restaurant_not_found' });
     }
 
-    const restaurantId = restaurantRows[0].id;
-
     await pool.query(
       `INSERT INTO restaurant_translations (restaurant_id, language_code, about_text)
        VALUES (?, ?, ?)
        ON DUPLICATE KEY UPDATE about_text = VALUES(about_text)`,
-      [restaurantId, language_code, about_text]
+      [restaurantRows[0].id, language_code, about_text]
     );
 
     res.json({ success: true });

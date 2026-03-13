@@ -31,8 +31,8 @@ const TRANSLATIONS = {
     followUs: 'Follow Us',
     notFound: 'Restaurant Not Found',
     notFoundMsg: "The restaurant you're looking for doesn't exist.",
-    newItems: 'New Items',
-    noNewItems: 'No new items at the moment.',
+    newBadge: 'NEW',
+    noDescription: '',
   },
   tr: {
     viewMenu: 'Menüyü Gör',
@@ -47,8 +47,8 @@ const TRANSLATIONS = {
     followUs: 'Bizi Takip Edin',
     notFound: 'Restoran Bulunamadı',
     notFoundMsg: 'Aradığınız restoran mevcut değil.',
-    newItems: 'Yeni Ürünler',
-    noNewItems: 'Şu an yeni ürün bulunmuyor.',
+    newBadge: 'YENİ',
+    noDescription: '',
   },
   es: {
     viewMenu: 'Ver Menú',
@@ -63,8 +63,8 @@ const TRANSLATIONS = {
     followUs: 'Síguenos',
     notFound: 'Restaurante No Encontrado',
     notFoundMsg: 'El restaurante que buscas no existe.',
-    newItems: 'Novedades',
-    noNewItems: 'No hay novedades en este momento.',
+    newBadge: 'NUEVO',
+    noDescription: '',
   },
   fr: {
     viewMenu: 'Voir le Menu',
@@ -79,8 +79,8 @@ const TRANSLATIONS = {
     followUs: 'Suivez-Nous',
     notFound: 'Restaurant Non Trouvé',
     notFoundMsg: "Le restaurant que vous cherchez n'existe pas.",
-    newItems: 'Nouveautés',
-    noNewItems: "Pas de nouveautés pour l'instant.",
+    newBadge: 'NOUVEAU',
+    noDescription: '',
   },
   ga: {
     viewMenu: 'Féach ar an Roghchlár',
@@ -95,28 +95,36 @@ const TRANSLATIONS = {
     followUs: 'Lean Sinn',
     notFound: 'Ní Bhfuarthas an Bialann',
     notFoundMsg: 'Níl an bhialann atá á lorg agat ann.',
-    newItems: 'Míreanna Nua',
-    noNewItems: 'Níl aon mhír nua faoi láthair.',
+    newBadge: 'NUA',
+    noDescription: '',
   },
 };
 
 function t(key) {
-  return (TRANSLATIONS[state.currentLang] && TRANSLATIONS[state.currentLang][key])
-    || TRANSLATIONS.en[key]
-    || key;
+  return (TRANSLATIONS[state.currentLang] && TRANSLATIONS[state.currentLang][key] !== undefined
+    ? TRANSLATIONS[state.currentLang][key]
+    : TRANSLATIONS.en[key]) || key;
 }
 
-async function init() {
-  const path = window.location.pathname;
-  const urlParams = new URLSearchParams(window.location.search);
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
+// ─── Init ────────────────────────────────────────────────────────────────────
+
+async function init() {
+  const urlParams = new URLSearchParams(window.location.search);
   const urlLang = urlParams.get('lang');
   const savedLang = localStorage.getItem('preferredLanguage');
   state.currentLang = urlLang || savedLang || 'en';
-
   updateLanguageSwitcher();
 
-  const pathParts = path.split('/').filter(p => p);
+  const pathParts = window.location.pathname.split('/').filter(p => p);
   if (pathParts.length === 0) {
     showError();
     return;
@@ -128,7 +136,8 @@ async function init() {
   state.selectedCategory = urlParams.get('category') ? parseInt(urlParams.get('category')) : null;
   state.selectedSubcategory = urlParams.get('subcategory') ? parseInt(urlParams.get('subcategory')) : null;
 
-  await fetchRestaurantData(slug);
+  const ok = await fetchRestaurantData(slug);
+  if (!ok) return;
 
   if (isMenuPage) {
     showMenuPage();
@@ -141,60 +150,51 @@ async function fetchRestaurantData(slug) {
   try {
     showLoading();
     const response = await fetch(`/api/restaurant/${slug}?lang=${state.currentLang}`);
-
-    if (!response.ok) {
-      throw new Error('Restaurant not found');
-    }
-
+    if (!response.ok) throw new Error('Restaurant not found');
     const data = await response.json();
     state.restaurant = data.restaurant;
     state.categories = data.categories;
     state.subcategories = data.subcategories;
     state.items = data.items;
-
     hideLoading();
+    return true;
   } catch (error) {
     console.error('Error fetching data:', error);
     hideLoading();
     showError();
+    return false;
   }
 }
 
-function showLoading() {
-  document.body.style.cursor = 'wait';
+function showLoading() { document.body.style.cursor = 'wait'; }
+function hideLoading() { document.body.style.cursor = 'default'; }
+
+function hideAllPages() {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
 }
 
-function hideLoading() {
-  document.body.style.cursor = 'default';
-}
+// ─── Pages ───────────────────────────────────────────────────────────────────
 
 function showHomepage() {
   hideAllPages();
-  const homepage = document.getElementById('homepage');
-  homepage.classList.remove('hidden');
+  document.getElementById('homepage').classList.remove('hidden');
   renderHomepage();
 }
 
 function showMenuPage() {
   hideAllPages();
-  const menuPage = document.getElementById('menu-page');
-  menuPage.classList.remove('hidden');
+  document.getElementById('menu-page').classList.remove('hidden');
   renderMenuPage();
 }
 
 function showError() {
   hideAllPages();
-  const errorPage = document.getElementById('error-page');
-  errorPage.classList.remove('hidden');
+  document.getElementById('error-page').classList.remove('hidden');
   document.getElementById('error-title').textContent = t('notFound');
   document.getElementById('error-message').textContent = t('notFoundMsg');
 }
 
-function hideAllPages() {
-  document.querySelectorAll('.page').forEach(page => {
-    page.classList.add('hidden');
-  });
-}
+// ─── Homepage ─────────────────────────────────────────────────────────────────
 
 function renderHomepage() {
   const { restaurant } = state;
@@ -206,31 +206,33 @@ function renderHomepage() {
     heroImage.style.backgroundImage = `url(${restaurant.logo_url})`;
   }
 
+  const logo = document.getElementById('restaurant-logo');
   if (restaurant.logo_url) {
-    const logo = document.getElementById('restaurant-logo');
     logo.src = restaurant.logo_url;
     logo.classList.remove('hidden');
+  } else {
+    logo.classList.add('hidden');
   }
 
   document.getElementById('story-title').textContent = t('ourStory');
-  // Use translated about_text if available, fall back to original
-  document.getElementById('restaurant-about').textContent = restaurant.about_text_display || restaurant.about_text || '';
+  document.getElementById('restaurant-about').textContent =
+    restaurant.about_text_display || restaurant.about_text || '';
 
   document.getElementById('view-menu-text').textContent = t('viewMenu');
 
   renderFooter('footer');
 
   document.getElementById('view-menu-btn').onclick = () => {
-    const slug = state.restaurant.slug;
-    window.location.href = `/${slug}/menu?lang=${state.currentLang}`;
+    window.location.href = `/${restaurant.slug}/menu?lang=${state.currentLang}`;
   };
 }
+
+// ─── Menu Page ────────────────────────────────────────────────────────────────
 
 function renderMenuPage() {
   const { restaurant } = state;
 
   document.getElementById('header-restaurant-name').textContent = restaurant.name;
-
   document.getElementById('back-home-btn').onclick = () => {
     window.location.href = `/${restaurant.slug}?lang=${state.currentLang}`;
   };
@@ -238,9 +240,10 @@ function renderMenuPage() {
   renderBreadcrumbs();
 
   if (!state.selectedCategory) {
+    // Initial menu view: show categories + new items below (no title, just items with NEW badge)
     renderCategoryFilters();
     document.getElementById('subcategory-filters').classList.add('hidden');
-    renderNewItems();
+    renderItems({ newOnly: true });
   } else {
     document.getElementById('category-filters').innerHTML = '';
     const subs = state.subcategories.filter(s => s.category_id === state.selectedCategory);
@@ -249,7 +252,7 @@ function renderMenuPage() {
     } else {
       document.getElementById('subcategory-filters').classList.add('hidden');
     }
-    renderMenuItems();
+    renderItems();
   }
 
   renderFooter('menu-footer');
@@ -258,7 +261,7 @@ function renderMenuPage() {
 function renderBreadcrumbs() {
   const breadcrumbs = document.getElementById('breadcrumbs');
 
-  if (!state.selectedCategory && !state.selectedSubcategory) {
+  if (!state.selectedCategory) {
     breadcrumbs.classList.add('hidden');
     return;
   }
@@ -281,7 +284,7 @@ function renderBreadcrumbs() {
     const cat = state.categories.find(c => c.id === state.selectedCategory);
     const backCatBtn = document.createElement('button');
     backCatBtn.className = 'btn-breadcrumb';
-    backCatBtn.textContent = `← ${cat?.name || ''}`;
+    backCatBtn.textContent = `← ${cat ? cat.name : ''}`;
     backCatBtn.onclick = () => {
       state.selectedSubcategory = null;
       updateURL();
@@ -319,7 +322,7 @@ function renderSubcategoryFilters(subs) {
   container.classList.remove('hidden');
 
   const cat = state.categories.find(c => c.id === state.selectedCategory);
-  container.innerHTML = `<h2 class="section-title">${cat?.name || ''}</h2>`;
+  container.innerHTML = `<h2 class="section-title">${cat ? cat.name : ''}</h2>`;
 
   const btnsContainer = document.createElement('div');
   btnsContainer.className = 'filter-buttons';
@@ -339,50 +342,25 @@ function renderSubcategoryFilters(subs) {
   container.appendChild(btnsContainer);
 }
 
-// Shown on first menu open (no category selected): only new items
-function renderNewItems() {
-  const container = document.getElementById('menu-items');
-  const newItems = state.items.filter(i => i.is_new);
+// ─── Items ────────────────────────────────────────────────────────────────────
 
+// Single function: renders items directly into #menu-items (which is already a CSS grid).
+// newOnly=true → show only is_new items (for initial menu view, no heading).
+function renderItems({ newOnly = false } = {}) {
+  const container = document.getElementById('menu-items');
   container.innerHTML = '';
 
-  const titleEl = document.createElement('h2');
-  titleEl.className = 'section-title new-items-title';
-  titleEl.textContent = t('newItems');
-  container.appendChild(titleEl);
-
-  if (newItems.length === 0) {
-    const msg = document.createElement('p');
-    msg.className = 'no-items';
-    msg.textContent = t('noNewItems');
-    container.appendChild(msg);
-    return;
-  }
-
-  const grid = document.createElement('div');
-  grid.className = 'new-items-grid';
-
-  newItems.forEach(item => {
-    grid.appendChild(buildItemCard(item));
-  });
-
-  container.appendChild(grid);
-}
-
-function renderMenuItems() {
-  const container = document.getElementById('menu-items');
-
-  let filteredItems = state.items;
+  let items = state.items;
 
   if (state.selectedSubcategory) {
-    filteredItems = state.items.filter(i => i.subcategory_id === state.selectedSubcategory);
+    items = state.items.filter(i => i.subcategory_id === state.selectedSubcategory);
   } else if (state.selectedCategory) {
-    filteredItems = state.items.filter(i => i.category_id === state.selectedCategory);
+    items = state.items.filter(i => i.category_id === state.selectedCategory);
+  } else if (newOnly) {
+    items = state.items.filter(i => i.is_new);
   }
 
-  container.innerHTML = '';
-
-  if (filteredItems.length === 0) {
+  if (items.length === 0) {
     const msg = document.createElement('p');
     msg.className = 'no-items';
     msg.textContent = t('noItems');
@@ -390,43 +368,48 @@ function renderMenuItems() {
     return;
   }
 
-  const grid = document.createElement('div');
-  grid.className = 'menu-items-grid';
-
-  filteredItems.forEach(item => {
-    grid.appendChild(buildItemCard(item));
+  // Cards go directly into the grid container — no extra wrapper div.
+  items.forEach(item => {
+    container.appendChild(buildItemCard(item));
   });
-
-  container.appendChild(grid);
 }
 
 function buildItemCard(item) {
   const card = document.createElement('div');
   card.className = 'menu-item-card';
 
+  const imageHtml = item.image_url
+    ? `<div class="item-image-container">
+         <img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.name)}" class="item-image" loading="lazy">
+         ${item.is_new ? `<span class="new-badge">${t('newBadge')}</span>` : ''}
+       </div>`
+    : '';
+
+  const inlineBadge = (item.is_new && !item.image_url)
+    ? `<span class="new-badge-inline">${t('newBadge')}</span>`
+    : '';
+
+  const descHtml = item.description
+    ? `<p class="item-description">${escapeHtml(item.description)}</p>`
+    : '';
+
+  const allergensHtml = item.allergens
+    ? `<div class="item-allergens">
+         ${item.allergens.split(',').slice(0, 3).map(a =>
+           `<span class="allergen-badge">${escapeHtml(a.trim())}</span>`
+         ).join('')}
+       </div>`
+    : '';
+
   card.innerHTML = `
-    ${item.image_url ? `
-      <div class="item-image-container">
-        <img src="${item.image_url}" alt="${escapeHtml(item.name)}" class="item-image" loading="lazy">
-        ${item.is_new ? `<span class="new-badge">NEW</span>` : ''}
-      </div>
-    ` : ''}
+    ${imageHtml}
     <div class="item-content">
       <div class="item-header">
-        <h3 class="item-name">
-          ${escapeHtml(item.name)}
-          ${item.is_new && !item.image_url ? '<span class="new-badge-inline">NEW</span>' : ''}
-        </h3>
+        <h3 class="item-name">${escapeHtml(item.name)}${inlineBadge}</h3>
         <span class="item-price">${parseFloat(item.price).toFixed(2)} ${escapeHtml(item.currency || '')}</span>
       </div>
-      ${item.description ? `<p class="item-description">${escapeHtml(item.description)}</p>` : ''}
-      ${item.allergens ? `
-        <div class="item-allergens">
-          ${item.allergens.split(',').slice(0, 3).map(a =>
-            `<span class="allergen-badge">${escapeHtml(a.trim())}</span>`
-          ).join('')}
-        </div>
-      ` : ''}
+      ${descHtml}
+      ${allergensHtml}
     </div>
   `;
 
@@ -434,28 +417,20 @@ function buildItemCard(item) {
   return card;
 }
 
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+// ─── Footer ───────────────────────────────────────────────────────────────────
 
-function renderFooter(containerId) {
-  const footer = document.getElementById(containerId);
+function renderFooter(id) {
+  const footer = document.getElementById(id);
   const { restaurant } = state;
-
-  const aboutText = restaurant.about_text_display || restaurant.about_text || `Welcome to ${restaurant.name}`;
+  const aboutText = restaurant.about_text_display || restaurant.about_text || '';
 
   footer.innerHTML = `
     <div class="footer-content">
       <div class="footer-section">
         <h3>${t('contact')}</h3>
         ${restaurant.phone ? `<p>📞 <a href="tel:${restaurant.phone}">${restaurant.phone}</a></p>` : ''}
-        ${restaurant.address ? `<p>📍 ${restaurant.address}</p>` : ''}
-        ${restaurant.opening_hours ? `<p>🕐 ${restaurant.opening_hours}</p>` : ''}
+        ${restaurant.address ? `<p>📍 ${escapeHtml(restaurant.address)}</p>` : ''}
+        ${restaurant.opening_hours ? `<p>🕐 ${escapeHtml(restaurant.opening_hours)}</p>` : ''}
       </div>
       <div class="footer-section">
         <h3>${t('about')}</h3>
@@ -476,12 +451,14 @@ function renderFooter(containerId) {
   `;
 }
 
+// ─── Modal ────────────────────────────────────────────────────────────────────
+
 function showModal(item) {
   const modal = document.getElementById('modal');
-
   document.getElementById('modal-title').textContent = item.name || '';
   document.getElementById('modal-description').textContent = item.description || '';
-  document.getElementById('modal-price').textContent = `${parseFloat(item.price).toFixed(2)} ${item.currency || ''}`;
+  document.getElementById('modal-price').textContent =
+    `${parseFloat(item.price).toFixed(2)} ${item.currency || ''}`;
 
   const modalImage = document.getElementById('modal-image');
   if (item.image_url) {
@@ -493,10 +470,10 @@ function showModal(item) {
 
   const allergensDiv = document.getElementById('modal-allergens');
   if (item.allergens) {
-    const allergensList = item.allergens.split(',').map(a => a.trim());
+    const list = item.allergens.split(',').map(a => a.trim());
     allergensDiv.innerHTML = `
       <span class="allergens-label">${t('allergens')}:</span>
-      ${allergensList.map(a => `<span class="allergen-badge">${escapeHtml(a)}</span>`).join('')}
+      ${list.map(a => `<span class="allergen-badge">${escapeHtml(a)}</span>`).join('')}
     `;
     allergensDiv.classList.remove('hidden');
   } else {
@@ -513,9 +490,10 @@ function hideModal() {
 document.getElementById('modal-close').onclick = hideModal;
 document.querySelector('.modal-overlay').onclick = hideModal;
 
+// ─── Language Switcher ────────────────────────────────────────────────────────
+
 function updateLanguageSwitcher() {
-  const flag = LANG_FLAGS[state.currentLang] || '🌐';
-  document.getElementById('current-lang-flag').textContent = flag;
+  document.getElementById('current-lang-flag').textContent = LANG_FLAGS[state.currentLang] || '🌐';
   document.getElementById('current-lang-code').textContent = state.currentLang.toUpperCase();
 }
 
@@ -536,7 +514,8 @@ document.querySelectorAll('.lang-option').forEach(btn => {
     window.history.replaceState({}, '', url);
 
     const slug = window.location.pathname.split('/').filter(p => p)[0];
-    await fetchRestaurantData(slug);
+    const ok = await fetchRestaurantData(slug);
+    if (!ok) return;
 
     const isMenuPage = window.location.pathname.includes('/menu');
     if (isMenuPage) {
@@ -547,32 +526,31 @@ document.querySelectorAll('.lang-option').forEach(btn => {
   };
 });
 
+document.addEventListener('click', (e) => {
+  const switcher = document.getElementById('language-switcher');
+  if (!switcher.contains(e.target)) {
+    document.getElementById('lang-dropdown').classList.add('hidden');
+  }
+});
+
+// ─── URL Helpers ──────────────────────────────────────────────────────────────
+
 function updateURL() {
   const url = new URL(window.location.href);
   url.searchParams.set('lang', state.currentLang);
-
   if (state.selectedCategory) {
     url.searchParams.set('category', state.selectedCategory);
   } else {
     url.searchParams.delete('category');
   }
-
   if (state.selectedSubcategory) {
     url.searchParams.set('subcategory', state.selectedSubcategory);
   } else {
     url.searchParams.delete('subcategory');
   }
-
   window.history.replaceState({}, '', url);
 }
 
-document.addEventListener('click', (e) => {
-  const switcher = document.getElementById('language-switcher');
-  const dropdown = document.getElementById('lang-dropdown');
-
-  if (!switcher.contains(e.target)) {
-    dropdown.classList.add('hidden');
-  }
-});
+// ─── Start ────────────────────────────────────────────────────────────────────
 
 window.addEventListener('DOMContentLoaded', init);

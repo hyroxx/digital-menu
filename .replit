@@ -1,0 +1,17 @@
+modules = ["nodejs-20", "web"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+PORT = "5000"
+NODE_ENV = "development"
+DB_HOST = "centerbeam.proxy.rlwy.net"
+DB_PORT = "13181"
+DB_USER = "root"
+DB_NAME = "railway"
+BASE_URL = "https://web-production-9446f.up.railway.app"

@@ -8,10 +8,14 @@ router.get('/:slug', async (req, res) => {
 
   try {
     const [restaurantRows] = await pool.query(
-      `SELECT id, name, slug, logo_url, about_text, phone, address, 
-              instagram_url, facebook_url, website_url, opening_hours 
-       FROM restaurants WHERE slug = ? LIMIT 1`,
-      [slug]
+      `SELECT r.id, r.name, r.slug, r.logo_url, r.about_text, r.phone, r.address,
+              r.instagram_url, r.facebook_url, r.website_url, r.opening_hours,
+              rt.about_text AS about_text_translated
+       FROM restaurants r
+       LEFT JOIN restaurant_translations rt
+         ON rt.restaurant_id = r.id AND rt.language_code = ?
+       WHERE r.slug = ? LIMIT 1`,
+      [lang, slug]
     );
 
     if (!restaurantRows || restaurantRows.length === 0) {
@@ -19,6 +23,8 @@ router.get('/:slug', async (req, res) => {
     }
 
     const restaurant = restaurantRows[0];
+    restaurant.about_text_display = restaurant.about_text_translated || restaurant.about_text;
+    delete restaurant.about_text_translated;
 
     const [categoryRows] = await pool.query(
       `SELECT c.id, c.restaurant_id, c.display_order,
@@ -68,6 +74,40 @@ router.get('/:slug', async (req, res) => {
     });
   } catch (err) {
     console.error('❌ Restaurant error:', err);
+    res.status(500).json({ error: 'server_error', detail: String(err) });
+  }
+});
+
+router.post('/:slug/translations', async (req, res) => {
+  const { slug } = req.params;
+  const { language_code, about_text } = req.body;
+
+  if (!language_code || !about_text) {
+    return res.status(400).json({ error: 'language_code and about_text are required' });
+  }
+
+  try {
+    const [restaurantRows] = await pool.query(
+      'SELECT id FROM restaurants WHERE slug = ? LIMIT 1',
+      [slug]
+    );
+
+    if (!restaurantRows || restaurantRows.length === 0) {
+      return res.status(404).json({ error: 'restaurant_not_found' });
+    }
+
+    const restaurantId = restaurantRows[0].id;
+
+    await pool.query(
+      `INSERT INTO restaurant_translations (restaurant_id, language_code, about_text)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE about_text = VALUES(about_text)`,
+      [restaurantId, language_code, about_text]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ Translation save error:', err);
     res.status(500).json({ error: 'server_error', detail: String(err) });
   }
 });

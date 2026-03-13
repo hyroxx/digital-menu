@@ -14,14 +14,34 @@ const pool = mysql.createPool({
   keepAliveInitialDelay: 0,
 });
 
-// Test connection
+async function runMigrations() {
+  const conn = await pool.getConnection();
+  try {
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS restaurant_translations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        restaurant_id INT NOT NULL,
+        language_code VARCHAR(10) NOT NULL,
+        about_text TEXT,
+        UNIQUE KEY uq_rest_lang (restaurant_id, language_code)
+      )
+    `);
+    console.log('✅ Migrations complete');
+  } catch (err) {
+    console.error('❌ Migration error:', err.message);
+  } finally {
+    conn.release();
+  }
+}
+
 pool.getConnection()
-  .then(conn => {
+  .then(async conn => {
     console.log('✅ MySQL connected to Railway database:', process.env.DB_HOST);
     conn.release();
+    await runMigrations();
   })
   .catch(err => {
-    console.error('❌ MySQL connection error:', err);
+    console.error('❌ MySQL connection error:', err.message);
   });
 
 module.exports = pool;

@@ -14,6 +14,7 @@ const LANG_FLAGS = {
   en: '🇬🇧',
   es: '🇪🇸',
   fr: '🇫🇷',
+  ga: '🇮🇪',
 };
 
 const TRANSLATIONS = {
@@ -30,6 +31,8 @@ const TRANSLATIONS = {
     followUs: 'Follow Us',
     notFound: 'Restaurant Not Found',
     notFoundMsg: "The restaurant you're looking for doesn't exist.",
+    newItems: 'New Items',
+    noNewItems: 'No new items at the moment.',
   },
   tr: {
     viewMenu: 'Menüyü Gör',
@@ -44,6 +47,8 @@ const TRANSLATIONS = {
     followUs: 'Bizi Takip Edin',
     notFound: 'Restoran Bulunamadı',
     notFoundMsg: 'Aradığınız restoran mevcut değil.',
+    newItems: 'Yeni Ürünler',
+    noNewItems: 'Şu an yeni ürün bulunmuyor.',
   },
   es: {
     viewMenu: 'Ver Menú',
@@ -58,6 +63,8 @@ const TRANSLATIONS = {
     followUs: 'Síguenos',
     notFound: 'Restaurante No Encontrado',
     notFoundMsg: 'El restaurante que buscas no existe.',
+    newItems: 'Novedades',
+    noNewItems: 'No hay novedades en este momento.',
   },
   fr: {
     viewMenu: 'Voir le Menu',
@@ -72,37 +79,57 @@ const TRANSLATIONS = {
     followUs: 'Suivez-Nous',
     notFound: 'Restaurant Non Trouvé',
     notFoundMsg: "Le restaurant que vous cherchez n'existe pas.",
+    newItems: 'Nouveautés',
+    noNewItems: "Pas de nouveautés pour l'instant.",
+  },
+  ga: {
+    viewMenu: 'Féach ar an Roghchlár',
+    ourStory: 'Ár Scéal',
+    categories: 'Catagóirí',
+    backHome: 'Ar Ais go dtí an Baile',
+    price: 'Praghas',
+    allergens: 'Alairgéiní',
+    noItems: 'Níl aon mhír sa chatagóir seo.',
+    contact: 'Teagmháil',
+    about: 'Fúinn',
+    followUs: 'Lean Sinn',
+    notFound: 'Ní Bhfuarthas an Bialann',
+    notFoundMsg: 'Níl an bhialann atá á lorg agat ann.',
+    newItems: 'Míreanna Nua',
+    noNewItems: 'Níl aon mhír nua faoi láthair.',
   },
 };
 
 function t(key) {
-  return TRANSLATIONS[state.currentLang][key] || TRANSLATIONS.en[key] || key;
+  return (TRANSLATIONS[state.currentLang] && TRANSLATIONS[state.currentLang][key])
+    || TRANSLATIONS.en[key]
+    || key;
 }
 
 async function init() {
   const path = window.location.pathname;
   const urlParams = new URLSearchParams(window.location.search);
-  
+
   const urlLang = urlParams.get('lang');
   const savedLang = localStorage.getItem('preferredLanguage');
   state.currentLang = urlLang || savedLang || 'en';
-  
+
   updateLanguageSwitcher();
-  
+
   const pathParts = path.split('/').filter(p => p);
   if (pathParts.length === 0) {
     showError();
     return;
   }
-  
+
   const slug = pathParts[0];
   const isMenuPage = pathParts[1] === 'menu';
-  
+
   state.selectedCategory = urlParams.get('category') ? parseInt(urlParams.get('category')) : null;
   state.selectedSubcategory = urlParams.get('subcategory') ? parseInt(urlParams.get('subcategory')) : null;
-  
+
   await fetchRestaurantData(slug);
-  
+
   if (isMenuPage) {
     showMenuPage();
   } else {
@@ -114,17 +141,17 @@ async function fetchRestaurantData(slug) {
   try {
     showLoading();
     const response = await fetch(`/api/restaurant/${slug}?lang=${state.currentLang}`);
-    
+
     if (!response.ok) {
       throw new Error('Restaurant not found');
     }
-    
+
     const data = await response.json();
     state.restaurant = data.restaurant;
     state.categories = data.categories;
     state.subcategories = data.subcategories;
     state.items = data.items;
-    
+
     hideLoading();
   } catch (error) {
     console.error('Error fetching data:', error);
@@ -171,27 +198,28 @@ function hideAllPages() {
 
 function renderHomepage() {
   const { restaurant } = state;
-  
+
   document.getElementById('restaurant-name').textContent = restaurant.name;
-  
+
   const heroImage = document.getElementById('hero-image');
   if (restaurant.logo_url) {
     heroImage.style.backgroundImage = `url(${restaurant.logo_url})`;
   }
-  
+
   if (restaurant.logo_url) {
     const logo = document.getElementById('restaurant-logo');
     logo.src = restaurant.logo_url;
     logo.classList.remove('hidden');
   }
-  
+
   document.getElementById('story-title').textContent = t('ourStory');
-  document.getElementById('restaurant-about').textContent = restaurant.about_text || '';
-  
+  // Use translated about_text if available, fall back to original
+  document.getElementById('restaurant-about').textContent = restaurant.about_text_display || restaurant.about_text || '';
+
   document.getElementById('view-menu-text').textContent = t('viewMenu');
-  
+
   renderFooter('footer');
-  
+
   document.getElementById('view-menu-btn').onclick = () => {
     const slug = state.restaurant.slug;
     window.location.href = `/${slug}/menu?lang=${state.currentLang}`;
@@ -200,18 +228,19 @@ function renderHomepage() {
 
 function renderMenuPage() {
   const { restaurant } = state;
-  
+
   document.getElementById('header-restaurant-name').textContent = restaurant.name;
-  
+
   document.getElementById('back-home-btn').onclick = () => {
     window.location.href = `/${restaurant.slug}?lang=${state.currentLang}`;
   };
-  
+
   renderBreadcrumbs();
-  
+
   if (!state.selectedCategory) {
     renderCategoryFilters();
     document.getElementById('subcategory-filters').classList.add('hidden');
+    renderNewItems();
   } else {
     document.getElementById('category-filters').innerHTML = '';
     const subs = state.subcategories.filter(s => s.category_id === state.selectedCategory);
@@ -220,23 +249,23 @@ function renderMenuPage() {
     } else {
       document.getElementById('subcategory-filters').classList.add('hidden');
     }
+    renderMenuItems();
   }
-  
-  renderMenuItems();
+
   renderFooter('menu-footer');
 }
 
 function renderBreadcrumbs() {
   const breadcrumbs = document.getElementById('breadcrumbs');
-  
+
   if (!state.selectedCategory && !state.selectedSubcategory) {
     breadcrumbs.classList.add('hidden');
     return;
   }
-  
+
   breadcrumbs.classList.remove('hidden');
   breadcrumbs.innerHTML = '';
-  
+
   const backBtn = document.createElement('button');
   backBtn.className = 'btn-breadcrumb';
   backBtn.textContent = `← ${t('categories')}`;
@@ -247,7 +276,7 @@ function renderBreadcrumbs() {
     renderMenuPage();
   };
   breadcrumbs.appendChild(backBtn);
-  
+
   if (state.selectedSubcategory) {
     const cat = state.categories.find(c => c.id === state.selectedCategory);
     const backCatBtn = document.createElement('button');
@@ -265,10 +294,10 @@ function renderBreadcrumbs() {
 function renderCategoryFilters() {
   const container = document.getElementById('category-filters');
   container.innerHTML = `<h2 class="section-title">${t('categories')}</h2>`;
-  
+
   const btnsContainer = document.createElement('div');
   btnsContainer.className = 'filter-buttons';
-  
+
   state.categories.forEach(cat => {
     const btn = document.createElement('button');
     btn.className = 'btn-filter';
@@ -281,20 +310,20 @@ function renderCategoryFilters() {
     };
     btnsContainer.appendChild(btn);
   });
-  
+
   container.appendChild(btnsContainer);
 }
 
 function renderSubcategoryFilters(subs) {
   const container = document.getElementById('subcategory-filters');
   container.classList.remove('hidden');
-  
+
   const cat = state.categories.find(c => c.id === state.selectedCategory);
   container.innerHTML = `<h2 class="section-title">${cat?.name || ''}</h2>`;
-  
+
   const btnsContainer = document.createElement('div');
   btnsContainer.className = 'filter-buttons';
-  
+
   subs.forEach(sub => {
     const btn = document.createElement('button');
     btn.className = 'btn-filter btn-filter-secondary';
@@ -306,67 +335,120 @@ function renderSubcategoryFilters(subs) {
     };
     btnsContainer.appendChild(btn);
   });
-  
+
   container.appendChild(btnsContainer);
+}
+
+// Shown on first menu open (no category selected): only new items
+function renderNewItems() {
+  const container = document.getElementById('menu-items');
+  const newItems = state.items.filter(i => i.is_new);
+
+  container.innerHTML = '';
+
+  const titleEl = document.createElement('h2');
+  titleEl.className = 'section-title new-items-title';
+  titleEl.textContent = t('newItems');
+  container.appendChild(titleEl);
+
+  if (newItems.length === 0) {
+    const msg = document.createElement('p');
+    msg.className = 'no-items';
+    msg.textContent = t('noNewItems');
+    container.appendChild(msg);
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'new-items-grid';
+
+  newItems.forEach(item => {
+    grid.appendChild(buildItemCard(item));
+  });
+
+  container.appendChild(grid);
 }
 
 function renderMenuItems() {
   const container = document.getElementById('menu-items');
-  
+
   let filteredItems = state.items;
-  
+
   if (state.selectedSubcategory) {
     filteredItems = state.items.filter(i => i.subcategory_id === state.selectedSubcategory);
   } else if (state.selectedCategory) {
     filteredItems = state.items.filter(i => i.category_id === state.selectedCategory);
   }
-  
+
+  container.innerHTML = '';
+
   if (filteredItems.length === 0) {
-    container.innerHTML = `<p class="no-items">${t('noItems')}</p>`;
+    const msg = document.createElement('p');
+    msg.className = 'no-items';
+    msg.textContent = t('noItems');
+    container.appendChild(msg);
     return;
   }
-  
-  container.innerHTML = '';
-  
+
+  const grid = document.createElement('div');
+  grid.className = 'menu-items-grid';
+
   filteredItems.forEach(item => {
-    const card = document.createElement('div');
-    card.className = 'menu-item-card';
-    
-    card.innerHTML = `
-      ${item.image_url ? `
-        <div class="item-image-container">
-          <img src="${item.image_url}" alt="${item.name}" class="item-image">
-          ${item.is_new ? '<span class="new-badge">🆕 NEW</span>' : ''}
+    grid.appendChild(buildItemCard(item));
+  });
+
+  container.appendChild(grid);
+}
+
+function buildItemCard(item) {
+  const card = document.createElement('div');
+  card.className = 'menu-item-card';
+
+  card.innerHTML = `
+    ${item.image_url ? `
+      <div class="item-image-container">
+        <img src="${item.image_url}" alt="${escapeHtml(item.name)}" class="item-image" loading="lazy">
+        ${item.is_new ? `<span class="new-badge">NEW</span>` : ''}
+      </div>
+    ` : ''}
+    <div class="item-content">
+      <div class="item-header">
+        <h3 class="item-name">
+          ${escapeHtml(item.name)}
+          ${item.is_new && !item.image_url ? '<span class="new-badge-inline">NEW</span>' : ''}
+        </h3>
+        <span class="item-price">${parseFloat(item.price).toFixed(2)} ${escapeHtml(item.currency || '')}</span>
+      </div>
+      ${item.description ? `<p class="item-description">${escapeHtml(item.description)}</p>` : ''}
+      ${item.allergens ? `
+        <div class="item-allergens">
+          ${item.allergens.split(',').slice(0, 3).map(a =>
+            `<span class="allergen-badge">${escapeHtml(a.trim())}</span>`
+          ).join('')}
         </div>
       ` : ''}
-      <div class="item-content">
-        <div class="item-header">
-          <h3 class="item-name">
-            ${item.name}
-            ${item.is_new && !item.image_url ? '<span class="new-badge-inline">🆕</span>' : ''}
-          </h3>
-          <span class="item-price">${parseFloat(item.price).toFixed(2)} ${item.currency}</span>
-        </div>
-        ${item.description ? `<p class="item-description">${item.description}</p>` : ''}
-        ${item.allergens ? `
-          <div class="item-allergens">
-            ${item.allergens.split(',').slice(0, 3).map(a => 
-              `<span class="allergen-badge">${a.trim()}</span>`
-            ).join('')}
-          </div>
-        ` : ''}
-      </div>
-    `;
-    
-    card.onclick = () => showModal(item);
-    container.appendChild(card);
-  });
+    </div>
+  `;
+
+  card.onclick = () => showModal(item);
+  return card;
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function renderFooter(containerId) {
   const footer = document.getElementById(containerId);
   const { restaurant } = state;
-  
+
+  const aboutText = restaurant.about_text_display || restaurant.about_text || `Welcome to ${restaurant.name}`;
+
   footer.innerHTML = `
     <div class="footer-content">
       <div class="footer-section">
@@ -377,30 +459,30 @@ function renderFooter(containerId) {
       </div>
       <div class="footer-section">
         <h3>${t('about')}</h3>
-        <p>${restaurant.about_text || `Welcome to ${restaurant.name}`}</p>
+        <p>${escapeHtml(aboutText)}</p>
       </div>
       <div class="footer-section">
         <h3>${t('followUs')}</h3>
         <div class="social-links">
-          ${restaurant.instagram_url ? `<a href="${restaurant.instagram_url}" target="_blank">Instagram</a>` : ''}
-          ${restaurant.facebook_url ? `<a href="${restaurant.facebook_url}" target="_blank">Facebook</a>` : ''}
-          ${restaurant.website_url ? `<a href="${restaurant.website_url}" target="_blank">Website</a>` : ''}
+          ${restaurant.instagram_url ? `<a href="${restaurant.instagram_url}" target="_blank" rel="noopener">Instagram</a>` : ''}
+          ${restaurant.facebook_url ? `<a href="${restaurant.facebook_url}" target="_blank" rel="noopener">Facebook</a>` : ''}
+          ${restaurant.website_url ? `<a href="${restaurant.website_url}" target="_blank" rel="noopener">Website</a>` : ''}
         </div>
       </div>
     </div>
     <div class="footer-bottom">
-      <p>© ${new Date().getFullYear()} ${restaurant.name}. All rights reserved.</p>
+      <p>© ${new Date().getFullYear()} ${escapeHtml(restaurant.name)}. All rights reserved.</p>
     </div>
   `;
 }
 
 function showModal(item) {
   const modal = document.getElementById('modal');
-  
-  document.getElementById('modal-title').textContent = item.name;
-  document.getElementById('modal-description').textContent = item.description || 'No description available.';
-  document.getElementById('modal-price').textContent = `${parseFloat(item.price).toFixed(2)} ${item.currency}`;
-  
+
+  document.getElementById('modal-title').textContent = item.name || '';
+  document.getElementById('modal-description').textContent = item.description || '';
+  document.getElementById('modal-price').textContent = `${parseFloat(item.price).toFixed(2)} ${item.currency || ''}`;
+
   const modalImage = document.getElementById('modal-image');
   if (item.image_url) {
     modalImage.src = item.image_url;
@@ -408,19 +490,19 @@ function showModal(item) {
   } else {
     modalImage.classList.add('hidden');
   }
-  
+
   const allergensDiv = document.getElementById('modal-allergens');
   if (item.allergens) {
     const allergensList = item.allergens.split(',').map(a => a.trim());
     allergensDiv.innerHTML = `
       <span class="allergens-label">${t('allergens')}:</span>
-      ${allergensList.map(a => `<span class="allergen-badge">${a}</span>`).join('')}
+      ${allergensList.map(a => `<span class="allergen-badge">${escapeHtml(a)}</span>`).join('')}
     `;
     allergensDiv.classList.remove('hidden');
   } else {
     allergensDiv.classList.add('hidden');
   }
-  
+
   modal.classList.remove('hidden');
 }
 
@@ -432,7 +514,8 @@ document.getElementById('modal-close').onclick = hideModal;
 document.querySelector('.modal-overlay').onclick = hideModal;
 
 function updateLanguageSwitcher() {
-  document.getElementById('current-lang-flag').textContent = LANG_FLAGS[state.currentLang];
+  const flag = LANG_FLAGS[state.currentLang] || '🌐';
+  document.getElementById('current-lang-flag').textContent = flag;
   document.getElementById('current-lang-code').textContent = state.currentLang.toUpperCase();
 }
 
@@ -441,52 +524,52 @@ document.getElementById('lang-btn').onclick = () => {
 };
 
 document.querySelectorAll('.lang-option').forEach(btn => {
-  btn.onclick = () => {
+  btn.onclick = async () => {
     const lang = btn.dataset.lang;
     state.currentLang = lang;
     localStorage.setItem('preferredLanguage', lang);
     updateLanguageSwitcher();
     document.getElementById('lang-dropdown').classList.add('hidden');
-    
+
     const url = new URL(window.location.href);
     url.searchParams.set('lang', lang);
     window.history.replaceState({}, '', url);
-    
+
     const slug = window.location.pathname.split('/').filter(p => p)[0];
-    fetchRestaurantData(slug).then(() => {
-      const isMenuPage = window.location.pathname.includes('/menu');
-      if (isMenuPage) {
-        renderMenuPage();
-      } else {
-        renderHomepage();
-      }
-    });
+    await fetchRestaurantData(slug);
+
+    const isMenuPage = window.location.pathname.includes('/menu');
+    if (isMenuPage) {
+      renderMenuPage();
+    } else {
+      renderHomepage();
+    }
   };
 });
 
 function updateURL() {
   const url = new URL(window.location.href);
   url.searchParams.set('lang', state.currentLang);
-  
+
   if (state.selectedCategory) {
     url.searchParams.set('category', state.selectedCategory);
   } else {
     url.searchParams.delete('category');
   }
-  
+
   if (state.selectedSubcategory) {
     url.searchParams.set('subcategory', state.selectedSubcategory);
   } else {
     url.searchParams.delete('subcategory');
   }
-  
+
   window.history.replaceState({}, '', url);
 }
 
 document.addEventListener('click', (e) => {
   const switcher = document.getElementById('language-switcher');
   const dropdown = document.getElementById('lang-dropdown');
-  
+
   if (!switcher.contains(e.target)) {
     dropdown.classList.add('hidden');
   }

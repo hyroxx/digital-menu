@@ -405,6 +405,17 @@ body {
   font-size: 1.125rem;
 }
 
+.new-items-title {
+  margin-top: 2rem;
+}
+
+.new-items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
 /* Modal */
 .modal {
   position: fixed;

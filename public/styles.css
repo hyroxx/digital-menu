@@ -6,8 +6,9 @@
 }
 
 :root {
-  --primary: #D97719;
-  --primary-dark: #B85C0A;
+  --primary: #7C3AED;
+  --primary-dark: #6D28D9;
+  --primary-light: #EDE9FE;
   --background: #FFFFFF;
   --surface: #F9F9F9;
   --border: #E5E5E5;

@@ -25,7 +25,7 @@ router.get('/:slug', async (req, res) => {
 
     const restaurant = restaurantRows[0];
 
-    if (!restaurant.about_text_translated && restaurant.about_text && lang !== 'en') {
+    if (!restaurant.about_text_translated && restaurant.about_text) {
       try {
         const translated = await translateText(restaurant.about_text, lang);
         if (translated && translated !== restaurant.about_text) {
